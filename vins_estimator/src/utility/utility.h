@@ -71,7 +71,7 @@ class Utility
         ans.template block<3, 1>(1, 0) = pp.vec(), ans.template block<3, 3>(1, 1) = pp.w() * Eigen::Matrix<typename Derived::Scalar, 3, 3>::Identity() - skewSymmetric(pp.vec());
         return ans;
     }
-
+    // return: [deg]
     static Eigen::Vector3d R2ypr(const Eigen::Matrix3d &R)
     {
         Eigen::Vector3d n = R.col(0);
@@ -89,6 +89,7 @@ class Utility
         return ypr / M_PI * 180.0;
     }
 
+    // ypr: [deg]
     template <typename Derived>
     static Eigen::Matrix<typename Derived::Scalar, 3, 3> ypr2R(const Eigen::MatrixBase<Derived> &ypr)
     {

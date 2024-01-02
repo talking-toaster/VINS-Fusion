@@ -24,6 +24,7 @@
 #include "feature_manager.h"
 #include "../utility/utility.h"
 #include "../utility/tic_toc.h"
+#include "../utility/queue_wrapper.hpp"
 #include "../initial/solve_5pts.h"
 #include "../initial/initial_sfm.h"
 #include "../initial/initial_alignment.h"
@@ -97,7 +98,7 @@ class Estimator
     std::mutex mPropagate;
     queue<pair<double, Eigen::Vector3d>> accBuf;
     queue<pair<double, Eigen::Vector3d>> gyrBuf;
-    queue<pair<double, map<int, vector<pair<int, Eigen::Matrix<double, 7, 1> > > > > > featureBuf;
+    RW_Queue<pair<double, map<int, vector<pair<int, Eigen::Matrix<double, 7, 1> > > > > > featureBuf;
     double prevTime, curTime;
     bool openExEstimation;
 

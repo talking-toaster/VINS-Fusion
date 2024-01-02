@@ -2,16 +2,17 @@ cmake_minimum_required(VERSION 2.8.3)
 project(loop_fusion)
 
 set(CMAKE_BUILD_TYPE "Release")
-set(CMAKE_CXX_FLAGS "-std=c++11")
+set(CMAKE_CXX_FLAGS "-std=c++17")
 #-DEIGEN_USE_MKL_ALL")
 set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-declarations") # ceres-solver版本过新，api变更警告
 
 find_package(catkin REQUIRED COMPONENTS
     roscpp
     std_msgs
     nav_msgs
     camera_models
-    cv_bridge
+    cv_bridge_local
     roslib
     )
 

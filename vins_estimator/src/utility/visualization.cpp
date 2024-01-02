@@ -155,23 +155,20 @@ void pubOdometry(const Estimator &estimator, const std_msgs::Header &header)
         // write result to file
         ofstream foutC(VINS_RESULT_PATH, ios::app);
         foutC.setf(ios::fixed, ios::floatfield);
-        foutC.precision(0);
-        foutC << header.stamp.toSec() * 1e9 << ",";
+        foutC.precision(9);
+        foutC << header.stamp.toSec() << " ";
         foutC.precision(5);
-        foutC << estimator.Ps[WINDOW_SIZE].x() << ","
-              << estimator.Ps[WINDOW_SIZE].y() << ","
-              << estimator.Ps[WINDOW_SIZE].z() << ","
-              << tmp_Q.w() << ","
-              << tmp_Q.x() << ","
-              << tmp_Q.y() << ","
-              << tmp_Q.z() << ","
-              << estimator.Vs[WINDOW_SIZE].x() << ","
-              << estimator.Vs[WINDOW_SIZE].y() << ","
-              << estimator.Vs[WINDOW_SIZE].z() << "," << endl;
+        foutC << estimator.Ps[WINDOW_SIZE].x() << " "
+              << estimator.Ps[WINDOW_SIZE].y() << " "
+              << estimator.Ps[WINDOW_SIZE].z() << " "
+              << tmp_Q.x() << " "
+              << tmp_Q.y() << " "
+              << tmp_Q.z() << " "
+              << tmp_Q.w() << endl;
         foutC.close();
         Eigen::Vector3d tmp_T = estimator.Ps[WINDOW_SIZE];
-        printf("time: %f, t: %f %f %f q: %f %f %f %f \n", header.stamp.toSec(), tmp_T.x(), tmp_T.y(), tmp_T.z(),
-                                                          tmp_Q.w(), tmp_Q.x(), tmp_Q.y(), tmp_Q.z());
+        Eigen::Vector3d rpy = Utility::R2ypr(estimator.Rs[WINDOW_SIZE]);
+        ROS_INFO_THROTTLE(1/10,"%s t: %.3f,%.3f,%.3f rpy[deg]:%.2f,%.2f,%.2f%s%s",ANSI_COLOR_GREEN, tmp_T.x(), tmp_T.y(), tmp_T.z(),rpy.x(),rpy.y(),rpy.z(),ANSI_COLOR_GREEN,ANSI_COLOR_RESET);
     }
 }
 

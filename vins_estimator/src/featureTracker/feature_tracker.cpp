@@ -453,12 +453,12 @@ void FeatureTracker::drawTrack(const cv::Mat &imLeft, const cv::Mat &imRight,
         cv::hconcat(imLeft, imRight, imTrack);
     else
         imTrack = imLeft.clone();
-    cv::cvtColor(imTrack, imTrack, CV_GRAY2RGB);
+    cv::cvtColor(imTrack, imTrack, cv::COLOR_GRAY2RGB);
 
     for (size_t j = 0; j < curLeftPts.size(); j++)
     {
         double len = std::min(1.0, 1.0 * track_cnt[j] / 20);
-        cv::circle(imTrack, curLeftPts[j], 2, cv::Scalar(255 * (1 - len), 0, 255 * len), 2);
+        cv::circle(imTrack, curLeftPts[j], 2, cv::Scalar(0, 255 * len, 255 * (1 - len)), 2); // BGR  , 追踪次数递增, 红色->绿色
     }
     if (!imRight.empty() && stereo_cam)
     {

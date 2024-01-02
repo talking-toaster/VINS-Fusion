@@ -403,10 +403,10 @@ int PoseGraph::detectLoop(KeyFrame* keyframe, int frame_index)
 */
     if (find_loop && frame_index > 50)
     {
-        int min_index = -1;
+         unsigned int min_index = UINT_MAX;
         for (unsigned int i = 0; i < ret.size(); i++)
         {
-            if (min_index == -1 || (ret[i].Id < min_index && ret[i].Score > 0.015))
+            if (min_index == UINT_MAX || (ret[i].Id < min_index && ret[i].Score > 0.015))
                 min_index = ret[i].Id;
         }
         return min_index;
