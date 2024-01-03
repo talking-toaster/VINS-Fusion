@@ -45,6 +45,29 @@ int MIN_DIST;
 double F_THRESHOLD;
 int SHOW_TRACK;
 int FLOW_BACK;
+
+
+bool		USE_MAG;
+std::string MAG_TOPIC;
+double	   MAG_MEASURE_NOISE;
+double	   MAG_WORLD_NOISE;
+double	   MAG_BIAS_NOISE;
+double	   MAG_LPF_CUTOFF_FREQ;
+
+bool	    USE_BARO;
+std::string BARO_TOPIC;
+std::string TEMPERATURE_TOPIC;
+double	   BARO_MEASURE_NOISE;	 // 单位:m
+double	   BARO_BIAS_NOISE;		 // 单位:m
+double	   BARO_LPF_CUTOFF_FREQ; // 单位:Hz
+
+bool		USE_EVALUATION;
+std::string GT_TOPIC;
+int GT_MODEL_ID;
+std::string GROUND_TRUTH_PATH;
+
+
+
 cv::FileStorage config;
 
 template <typename T>
@@ -98,15 +121,45 @@ void readParameters(std::string config_file)
         GYR_W = gyr_w_base * gyr_w_factor;
         G.z() = readParam<double>("g_norm");
     }
+    USE_MAG = readParam<bool>("use_mag");
+	if (USE_MAG) {
+        double mag_measure_factor = readParam<double>("mag_measure_factor");
+        double mag_world_factor = readParam<double>("mag_world_factor");
+        double mag_bias_factor = readParam<double>("mag_bias_factor");
+		MAG_TOPIC			= readParam<std::string>("mag_topic");
+		MAG_MEASURE_NOISE	= readParam<double>("mag_measure_noise")*mag_measure_factor;
+		MAG_WORLD_NOISE		= readParam<double>("mag_world_noise")*mag_world_factor;
+		MAG_BIAS_NOISE		= readParam<double>("mag_bias_noise")*mag_bias_factor;
+		MAG_LPF_CUTOFF_FREQ = readParam<double>("mag_lpf_cutoff_freq");
+	}
+    USE_BARO = readParam<int>("use_baro");
+	if (USE_BARO) {
+        double baro_measure_factor = readParam<double>("baro_measure_factor");
+        double baro_bias_factor = readParam<double>("baro_bias_factor");
+		BARO_TOPIC			 = readParam<std::string>("baro_topic");
+		TEMPERATURE_TOPIC	 = readParam<std::string>("temperature_topic");
+		BARO_MEASURE_NOISE	 = readParam<double>("baro_measure_noise")*baro_measure_factor;
+		BARO_BIAS_NOISE		 = readParam<double>("baro_bias_noise")*baro_bias_factor;
+		BARO_LPF_CUTOFF_FREQ = readParam<double>("baro_lpf_cutoff_freq");
+	}
+    USE_EVALUATION = readParam<bool>("use_evaluation");
+	if (USE_EVALUATION) {
+		GT_TOPIC = readParam<std::string>("gt_topic");
+        GT_MODEL_ID = readParam<int>("gt_model_id");
+	}
+
     SOLVER_TIME = readParam<double>("max_solver_time");
     NUM_ITERATIONS = readParam<int>("max_num_iterations");
     MIN_PARALLAX = readParam<double>("keyframe_parallax");
     MIN_PARALLAX = MIN_PARALLAX / FOCAL_LENGTH;
     OUTPUT_FOLDER = readParam<std::string>("output_path");
     VINS_RESULT_PATH = OUTPUT_FOLDER + "/vio.csv";
+	GROUND_TRUTH_PATH = OUTPUT_FOLDER + "/groundtruth.csv";
     std::cout << "result path " << VINS_RESULT_PATH << std::endl;
     std::ofstream fout(VINS_RESULT_PATH, std::ios::out);
     fout.close();
+    std::ofstream fout_gt(GROUND_TRUTH_PATH, std::ios::out);
+	fout_gt.close();
 
     ESTIMATE_EXTRINSIC = readParam<int>("estimate_extrinsic");
     if (ESTIMATE_EXTRINSIC == 2)

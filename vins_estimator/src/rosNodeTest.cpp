@@ -20,14 +20,25 @@
 #include "estimator/estimator.h"
 #include "estimator/parameters.h"
 #include "utility/visualization.h"
+#include <sensor_msgs/MagneticField.h>
+#include <sensor_msgs/FluidPressure.h>
+#include <sensor_msgs/Temperature.h>
+#include <gazebo_msgs/ModelStates.h>
 
 Estimator estimator;
 
+sensor_msgs::Temperature temperature_msg;
+bool get_temperature = false;
 queue<sensor_msgs::ImuConstPtr> imu_buf;
 queue<sensor_msgs::PointCloudConstPtr> feature_buf;
 queue<sensor_msgs::ImageConstPtr> img0_buf;
 queue<sensor_msgs::ImageConstPtr> img1_buf;
 std::mutex m_buf;
+
+ros::Publisher pub_mag_lpf;
+ros::Publisher		pub_baro_alt;
+ros::Publisher		pub_raw_baro_alt;
+ros::Publisher      gt_pose_pub;
 
 
 void img0_callback(const sensor_msgs::ImageConstPtr &img_msg)
@@ -221,6 +232,107 @@ void cam_switch_callback(const std_msgs::BoolConstPtr &switch_msg)
     return;
 }
 
+void mag_callback(const sensor_msgs::MagneticFieldConstPtr &mag_msg) {
+	double	 t	= mag_msg->header.stamp.toSec();
+	double	 mx = mag_msg->magnetic_field.x;
+	double	 my = mag_msg->magnetic_field.y;
+	double	 mz = mag_msg->magnetic_field.z;
+	Vector3d mag(mx, my, mz); // 传到后端为ENU坐标系
+    static Utility::LPF_3D mag_lpf(1.0 / 80, MAG_LPF_CUTOFF_FREQ);
+	Eigen::Vector3d mag_lpfed = mag_lpf.update(mag);
+    sensor_msgs::MagneticField mag_lpf_msg;
+    mag_lpf_msg.header = mag_msg->header;
+    mag_lpf_msg.magnetic_field.x = mag_lpfed.x();
+    mag_lpf_msg.magnetic_field.y = mag_lpfed.y();
+    mag_lpf_msg.magnetic_field.z = mag_lpfed.z();
+    pub_mag_lpf.publish(mag_lpf_msg);
+	estimator.inputMag(t, mag_lpfed);
+}
+
+void temperature_callback(const sensor_msgs::Temperature &_temperature_msg) {
+	temperature_msg = _temperature_msg;
+	get_temperature = true;
+}
+float PressureToAltitude(float pressure_pa, float temperature)  {
+    static constexpr float CONSTANTS_ABSOLUTE_NULL_CELSIUS = -273.15f; // °C
+    static constexpr float CONSTANTS_AIR_GAS_CONST		   = 287.1f;   // J/(kg * K)
+    static constexpr float CONSTANTS_ONE_G				   = 9.80665f; // m/s^2
+    // calculate altitude using the hypsometric equation
+    static constexpr float T1 = 15.f - CONSTANTS_ABSOLUTE_NULL_CELSIUS; // temperature at base height in Kelvin
+    static constexpr float a  = -6.5f / 1000.f;							// temperature gradient in degrees per metre
+
+    static constexpr float sens_baro_qnh = 1013.25f;
+
+    // current pressure at MSL in kPa (QNH in hPa)
+    const float p1 = sens_baro_qnh * 0.1f;
+
+    // measured pressure in kPa
+    const float p = pressure_pa * 0.001f;
+
+    /*
+    * Solve:
+    *
+    *     /        -(aR / g)     \
+    *    | (p / p1)          . T1 | - T1
+    *     \                      /
+    * h = -------------------------------  + h1
+    *                   a
+    */
+    float altitude = (((powf((p / p1), (-(a * CONSTANTS_AIR_GAS_CONST) / CONSTANTS_ONE_G))) * T1) - T1) / a;
+
+    return altitude;
+}
+
+void baro_callback(const sensor_msgs::FluidPressurePtr &baro_msg) {
+
+	static bool			   init_baro_alt = false;
+	static float		   home_alt		 = 0;
+    static const int       baro_sample_rate = 40;
+	static Utility::LPF_1D baro_lpf(1.0 / baro_sample_rate , BARO_LPF_CUTOFF_FREQ);
+	if (!get_temperature){
+        ROS_WARN("No temperature message received, baro altitude will not be caculated.");
+        return;
+    }
+	double t			   = baro_msg->header.stamp.toSec();
+	double pressure_pa	   = baro_msg->fluid_pressure;
+	float  baro_alt		   = PressureToAltitude(pressure_pa, temperature_msg.temperature);
+	double baro_alt_smooth = baro_lpf.update(baro_alt);
+	if (!init_baro_alt) {
+		home_alt	  = baro_alt_smooth;
+		init_baro_alt = true;
+	}
+	std_msgs::Float32 baro_alt_msg;
+	baro_alt_msg.data = baro_alt_smooth - home_alt;
+	pub_baro_alt.publish(baro_alt_msg);
+
+	std_msgs::Float32 raw_baro_alt_msg;
+	raw_baro_alt_msg.data = baro_alt - home_alt;
+	pub_raw_baro_alt.publish(raw_baro_alt_msg);
+	estimator.inputBaro(t, baro_alt_smooth - home_alt);
+}
+
+void ground_truth_callback(const gazebo_msgs::ModelStatesPtr &msg) {
+	// write result to file
+    assert(int(msg->name.size()) > GT_MODEL_ID && "GT_MODEL_ID out of model range");
+    auto time_now = ros::Time().now();
+    geometry_msgs::Pose &pose = msg->pose[GT_MODEL_ID];
+	ofstream foutC(GROUND_TRUTH_PATH, ios::app);
+	foutC.setf(ios::fixed, ios::floatfield);
+	foutC.precision(9);
+	foutC <<time_now.toSec() << " ";
+	foutC.precision(5);
+	foutC << pose.position.x << " " << pose.position.y << " " << pose.position.z << " "
+		  << pose.orientation.x << " " << pose.orientation.y << " " << pose.orientation.z
+		  << " " << pose.orientation.w << endl;
+	foutC.close();
+    // geometry_msgs::PoseStamped gt_pose_msg;
+    // gt_pose_msg.header.stamp = time_now;
+    // gt_pose_msg.header.frame_id = "world";
+    // gt_pose_msg.pose = pose;
+    // gt_pose_pub.publish(gt_pose_msg);
+}
+
+
 int main(int argc, char **argv)
 {
     ros::init(argc, argv, "vins_estimator");
@@ -250,17 +362,39 @@ int main(int argc, char **argv)
     registerPub(n);
 
     ros::Subscriber sub_imu;
+    ros::Subscriber sub_mag;
+    ros::Subscriber sub_baro;
+    ros::Subscriber sub_imu_temperautre;
+    ros::Subscriber sub_gt;
     if(USE_IMU)
     {
-        sub_imu = n.subscribe(IMU_TOPIC, 2000, imu_callback, ros::TransportHints().tcpNoDelay());
+        sub_imu = n.subscribe(IMU_TOPIC, 10, imu_callback, ros::TransportHints().tcpNoDelay());
+    }
+    if(USE_MAG)
+    {
+        sub_mag = n.subscribe(MAG_TOPIC, 10, mag_callback,ros::TransportHints().tcpNoDelay());
+        pub_mag_lpf = n.advertise<sensor_msgs::MagneticField>("/vins_estimator/mag_lpf", 10);
+    }
+    if(USE_BARO){
+        sub_baro = n.subscribe(BARO_TOPIC, 10, baro_callback,ros::TransportHints().tcpNoDelay());
+        sub_imu_temperautre = n.subscribe(TEMPERATURE_TOPIC, 10, temperature_callback,ros::TransportHints().tcpNoDelay());
+        pub_baro_alt	 = n.advertise<std_msgs::Float32>("baro_alt", 10);
+		pub_raw_baro_alt = n.advertise<std_msgs::Float32>("raw_baro_alt", 10);
     }
     ros::Subscriber sub_feature = n.subscribe("/feature_tracker/feature", 2000, feature_callback);
-    ros::Subscriber sub_img0 = n.subscribe(IMAGE0_TOPIC, 100, img0_callback);
+    ros::Subscriber sub_img0 = n.subscribe(IMAGE0_TOPIC, 100, img0_callback,ros::TransportHints().tcpNoDelay());
     ros::Subscriber sub_img1;
     if(STEREO)
     {
-        sub_img1 = n.subscribe(IMAGE1_TOPIC, 100, img1_callback);
+        sub_img1 = n.subscribe(IMAGE1_TOPIC, 100, img1_callback,ros::TransportHints().tcpNoDelay());
     }
+    if(USE_EVALUATION)
+    {
+        sub_gt = n.subscribe(GT_TOPIC, 10, ground_truth_callback,ros::TransportHints().tcpNoDelay());
+        //gt_pose_pub = n.advertise<geometry_msgs::PoseStamped>("/vins_estimator/ground_truth", 10);
+    }
+
+
     ros::Subscriber sub_restart = n.subscribe("/vins_restart", 100, restart_callback);
     ros::Subscriber sub_imu_switch = n.subscribe("/vins_imu_switch", 100, imu_switch_callback);
     ros::Subscriber sub_cam_switch = n.subscribe("/vins_cam_switch", 100, cam_switch_callback);

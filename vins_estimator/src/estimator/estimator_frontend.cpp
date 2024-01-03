@@ -52,6 +52,11 @@ void Estimator::clearState()
         Vs[i].setZero();
         Bas[i].setZero();
         Bgs[i].setZero();
+        Mw[i].setZero();
+        Bms[i].setZero();
+        mag_measure[i].setZero();
+        baro_measure[i] = 0;
+		Bbs[i]			= 0;
         dt_buf[i].clear();
         linear_acceleration_buf[i].clear();
         angular_velocity_buf[i].clear();
@@ -215,6 +220,16 @@ void Estimator::inputIMU(double t, const Vector3d &linearAcceleration, const Vec
         mPropagate.unlock();
     }
 }
+void Estimator::inputMag(double t, const Vector3d &mag) {
+	if (magBuf.size() > 100)
+		magBuf.pop();
+	magBuf.push(make_pair(t, mag));
+}
+void Estimator::inputBaro(double t, const float baro_rel_alt) {
+	if (baroBuf.size() > 100)
+		baroBuf.pop();
+	baroBuf.push(make_pair(t, baro_rel_alt));
+}
 
 void Estimator::inputFeature(double t, const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &featureFrame)
 {
@@ -267,7 +282,86 @@ bool Estimator::IMUAvailable(double t)
     else
         return false;
 }
+bool Estimator::getMag(double t, Eigen::Vector3d &mag) {
+	if (magBuf.empty()) {
+		printf("not receive mag\n");
+		return false;
+	}
+	double			t1 = 0, t2;
+	Eigen::Vector3d prev_mag;
+	Eigen::Vector3d next_mag;
 
+	while (magBuf.front() && magBuf.front()->first < t) {
+		std::pair<double, Eigen::Vector3d> mag_stamped;
+		if (!magBuf.try_pop(mag_stamped)) {
+			ROS_WARN("magBuf try_pop failed");
+			return false;
+		}
+		prev_mag = mag_stamped.second;
+		t1		 = mag_stamped.first;
+		mag		 = prev_mag;
+	}
+	// assert(!magBuf.empty() && "magBuf should not be empty");
+	if (!magBuf.empty()) {
+		next_mag = magBuf.front()->second;
+		t2		 = magBuf.front()->first;
+		assert(t1 >= 0 && t2 >= 0 && "t1 t2 should be positive");
+		mag = (t - t1) / (t2 - t1) * (next_mag - prev_mag) + prev_mag;
+		// ROS_WARN_STREAM("t1: " << t1 << " prev_mag: " << prev_mag << " t2: " << t2 << " next_mag:" << next_mag
+		// 					   << " t:" << t << " mag:" << mag);
+	} else {
+		mag = prev_mag;
+	}
+	return true;
+}
+bool Estimator::getBaro(double t, double &baro_rel_alt) {
+	if (baroBuf.empty()) {
+		printf("not receive baro\n");
+		return false;
+	}
+	double t1 = 0, t2 = 0;
+	double prev_baro = INFINITY;
+	double next_baro = 0;
+	assert(!baroBuf.empty() && "baroBuf should not be empty");
+	assert(baroBuf.front() && "baroBuf.front() should not be empty");
+
+	while (baroBuf.front() && baroBuf.front()->first < t) {
+		prev_baro = baroBuf.front()->second;
+		t1		  = t - baroBuf.front()->first;
+		baroBuf.pop();
+	}
+	if (!baroBuf.empty()) {
+		next_baro = baroBuf.front()->second;
+		t2		  = baroBuf.front()->first - t;
+		if (std::isinf(prev_baro)) {
+			baro_rel_alt = next_baro - Vs[frame_count].z() * t2;
+			return true;
+		} else {
+			double dt	 = t1 + t2;
+			baro_rel_alt = (t2 / dt) * prev_baro + (t1 / dt) * next_baro;
+			return true;
+		}
+	} else { // no next_baro
+		baro_rel_alt = prev_baro + Vs[frame_count].z() * t1;
+		return true;
+	}
+}
+
+
+void Estimator::processMag(const Vector3d &mag) {
+	if (frame_count == 0) {
+		Mw[0]  = Rs[0] * mag;
+		Bms[0] = Vector3d(0, 0, 0);
+	} else {
+		Mw[frame_count]	 = Mw[frame_count - 1];
+		Bms[frame_count] = Bms[frame_count - 1];
+	}
+	mag_measure[frame_count] = mag;
+}
+void Estimator::processBaro(const double baro_rel_alt) {
+	baro_measure[frame_count] = baro_rel_alt;
+	Bbs[frame_count]		  = frame_count == 0 ? 0 : Bbs[frame_count - 1];
+}
 void Estimator::processMeasurements()
 {
     while (1)
@@ -275,6 +369,9 @@ void Estimator::processMeasurements()
         static TicToc t_process;
         pair<double, map<int, vector<pair<int, Eigen::Matrix<double, 7, 1> > > > > feature;
         vector<pair<double, Eigen::Vector3d>> accVector, gyrVector;
+		Eigen::Vector3d						  mag = Eigen::Vector3d(0,0,0);
+		double								  baro_rel_alt = 0.0;
+        bool have_mag  = false,have_baro=false;
         if(featureBuf.try_pop(feature))
         {
             if (solver_flag == Estimator::SolverFlag::NON_LINEAR) {
@@ -305,8 +402,23 @@ void Estimator::processMeasurements()
             t_process.tic();
             if(USE_IMU)
             {
-                if(!initFirstPoseFlag)
-                    initFirstIMUPose(accVector);
+                if(!initFirstPoseFlag){
+                    if(USE_MAG){
+                        while(!getMag(curTime,mag)){
+                            ROS_WARN("wait for mag");
+							std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                        }
+                        have_mag = true;
+                    }
+                    if(USE_BARO){
+                        while(!getBaro(curTime,baro_rel_alt)){
+                            ROS_WARN("wait for baro");
+                            std::this_thread::sleep_for(std::chrono::milliseconds(5));
+                        }
+                        have_baro = true;
+                    }
+                    initFirstIMUPose(accVector, mag, baro_rel_alt, have_mag, have_baro);
+                }
                 for(size_t i = 0; i < accVector.size(); i++)
                 {
                     double dt;
@@ -317,6 +429,16 @@ void Estimator::processMeasurements()
                     else
                         dt = accVector[i].first - accVector[i - 1].first;
                     processIMU(accVector[i].first, dt, accVector[i].second, gyrVector[i].second);
+                }
+                if(USE_MAG){
+                    if(!have_mag)
+                        getMag(curTime, mag);
+                    processMag(mag);
+                }
+                if(USE_BARO){
+                    if(!have_baro)
+                        getBaro(curTime, baro_rel_alt);
+                    processBaro(baro_rel_alt);
                 }
             }
             mProcess.lock();
@@ -340,6 +462,18 @@ void Estimator::processMeasurements()
 
             t_process.toc();
             ROS_INFO("%s[backend] used: cur: %3.1fms avg: %3.1fms%s%s",ANSI_COLOR_BLUE, t_process.cur_ms, t_process.avg_ms,ANSI_COLOR_BLUE, ANSI_COLOR_RESET);
+            // for(int i=0;i<WINDOW_SIZE+1;i++){
+            //     std::cout<<Bbs[i]<<" ";
+            // }
+            // std::cout<<"\n";
+            // for(int i=0;i<WINDOW_SIZE+1;i++){
+            //     std::cout<<baro_measure[i]<<" ";
+            // }
+            // std::cout<<"\n";
+            // for(int i=0;i<WINDOW_SIZE+1;i++){
+            //     std::cout<<Ps[i][2]<<" ";
+            // }
+            // std::cout<<"\n";
         }
 
         if (! MULTIPLE_THREAD)
@@ -351,25 +485,34 @@ void Estimator::processMeasurements()
 }
 
 
-void Estimator::initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVector)
-{
-    printf("init first imu pose\n");
-    initFirstPoseFlag = true;
-    //return;
-    Eigen::Vector3d averAcc(0, 0, 0);
-    int n = (int)accVector.size();
-    for(size_t i = 0; i < accVector.size(); i++)
-    {
-        averAcc = averAcc + accVector[i].second;
-    }
-    averAcc = averAcc / n;
-    printf("averge acc %f %f %f\n", averAcc.x(), averAcc.y(), averAcc.z());
-    Matrix3d R0 = Utility::g2R(averAcc);
-    double yaw = Utility::R2ypr(R0).x();
-    R0 = Utility::ypr2R(Eigen::Vector3d{-yaw, 0, 0}) * R0;
-    Rs[0] = R0;
-    cout << "init R0 " << endl << Rs[0] << endl;
-    //Vs[0] = Vector3d(5, 0, 0);
+void Estimator::initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVector, const Eigen::Vector3d &mag,
+								 double baro_ref_alt, bool have_mag, bool have_baro) {
+	printf("init first imu pose\n");
+	initFirstPoseFlag = true;
+	// return;
+	Eigen::Vector3d averAcc(0, 0, 0);
+	int				n = (int)accVector.size();
+	for (size_t i = 0; i < accVector.size(); i++) {
+		averAcc = averAcc + accVector[i].second;
+	}
+	averAcc = averAcc / n;
+	printf("averge acc %f %f %f\n", averAcc.x(), averAcc.y(), averAcc.z());
+	Matrix3d R0	 = Utility::g2R(averAcc);
+	double	 yaw = Utility::R2ypr(R0).x();
+	R0			 = Utility::ypr2R(Eigen::Vector3d{-yaw, 0, 0}) * R0;
+	ROS_INFO_STREAM("mag:" << mag.transpose());
+	if (USE_MAG && have_mag ) {
+		Vector3d mag_enu = R0 * mag;
+		if (mag_enu.y() == 0)
+			mag_enu.y() = 1e-20;
+		double mag_yaw = atan2(mag_enu.x(), mag_enu.y()) * 180 / M_PI; // 正东为0度
+		mag_yaw += 7;
+		R0 = Utility::ypr2R(Eigen::Vector3d{mag_yaw, 0, 0}) * R0;
+		ROS_WARN("init yaw by mag %f", mag_yaw);
+	}
+	Rs[0] = R0;
+	std::cout << "init R0 " << endl << Rs[0] << endl;
+	ROS_INFO_STREAM("init ypr:" << Utility::R2ypr(R0).transpose());
 }
 
 void Estimator::initFirstPose(Eigen::Vector3d p, Eigen::Matrix3d r)
@@ -684,6 +827,17 @@ void Estimator::vector2double()
             para_SpeedBias[i][7] = Bgs[i].y();
             para_SpeedBias[i][8] = Bgs[i].z();
         }
+        if (USE_MAG) {
+			para_mag[i][0] = Mw[i].x();
+			para_mag[i][1] = Mw[i].y();
+			para_mag[i][2] = Mw[i].z();
+			para_mag[i][3] = Bms[i].x();
+			para_mag[i][4] = Bms[i].y();
+			para_mag[i][5] = Bms[i].z();
+		}
+        if (USE_BARO) {
+			para_baro[i][0] = Bbs[i];
+		}
     }
 
     for (int i = 0; i < NUM_OF_CAM; i++)
@@ -783,6 +937,17 @@ void Estimator::double2vector()
                                  para_Ex_Pose[i][5]).normalized().toRotationMatrix();
         }
     }
+    if (USE_MAG) {
+		for (int i = 0; i <= WINDOW_SIZE; i++) {
+			Mw[i]  = Vector3d(para_mag[i][0], para_mag[i][1], para_mag[i][2]);
+			Bms[i] = Vector3d(para_mag[i][3], para_mag[i][4], para_mag[i][5]);
+		}
+	}
+    if (USE_BARO) {
+		for (int i = 0; i <= WINDOW_SIZE; i++) {
+			Bbs[i] = para_baro[i][0];
+		}
+	}
 
     VectorXd dep = f_manager.getDepthVector();
     for (int i = 0; i < f_manager.getFeatureCount(); i++)
@@ -990,6 +1155,11 @@ void Estimator::updateLatestStates()
     latest_V = Vs[frame_count];
     latest_Ba = Bas[frame_count];
     latest_Bg = Bgs[frame_count];
+	latest_Mw										= Mw[frame_count];
+	latest_Bm										= Bms[frame_count];
+	latest_mag_measure								= mag_measure[frame_count];
+    latest_baro_measure								= baro_measure[frame_count];
+	latest_Bb										= Bbs[frame_count];
     latest_acc_0 = acc_0;
     latest_gyr_0 = gyr_0;
     mBuf.lock();

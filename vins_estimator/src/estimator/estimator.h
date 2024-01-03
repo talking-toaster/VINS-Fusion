@@ -50,8 +50,12 @@ class Estimator
     void inputIMU(double t, const Vector3d &linearAcceleration, const Vector3d &angularVelocity);
     void inputFeature(double t, const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &featureFrame);
     void inputImage(double t, const cv::Mat &_img, const cv::Mat &_img1 = cv::Mat());
+    void inputMag(double t, const Vector3d &mag);
+	void inputBaro(double t, const float baro_rel_alt);
     void processIMU(double t, double dt, const Vector3d &linear_acceleration, const Vector3d &angular_velocity);
     void processImage(const map<int, vector<pair<int, Eigen::Matrix<double, 7, 1>>>> &image, const double header);
+    void processMag(const Vector3d &mag);
+	void processBaro(const double baro_rel_alt);
     void processMeasurements();
     void changeSensorType(int use_imu, int use_stereo);
 
@@ -69,6 +73,8 @@ class Estimator
     bool failureDetection();
     bool getIMUInterval(double t0, double t1, vector<pair<double, Eigen::Vector3d>> &accVector, 
                                               vector<pair<double, Eigen::Vector3d>> &gyrVector);
+    bool getMag(double t, Eigen::Vector3d &mag);
+	bool getBaro(double t, double &baro_rel_alt);
     void getPoseInWorldFrame(Eigen::Matrix4d &T);
     void getPoseInWorldFrame(int index, Eigen::Matrix4d &T);
     void predictPtsInNextFrame();
@@ -79,7 +85,8 @@ class Estimator
     void updateLatestStates();
     void fastPredictIMU(double t, Eigen::Vector3d linear_acceleration, Eigen::Vector3d angular_velocity);
     bool IMUAvailable(double t);
-    void initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVector);
+    void initFirstIMUPose(vector<pair<double, Eigen::Vector3d>> &accVector, const Eigen::Vector3d &mag,
+								 double baro_ref_alt, bool have_mag, bool have_baro);
 
     enum SolverFlag
     {
@@ -99,6 +106,8 @@ class Estimator
     queue<pair<double, Eigen::Vector3d>> accBuf;
     queue<pair<double, Eigen::Vector3d>> gyrBuf;
     RW_Queue<pair<double, map<int, vector<pair<int, Eigen::Matrix<double, 7, 1> > > > > > featureBuf;
+    RW_Queue<std::pair<double, Eigen::Vector3d>> magBuf;
+    RW_Queue<std::pair<double, float>>			 baroBuf;
     double prevTime, curTime;
     bool openExEstimation;
 
@@ -119,10 +128,15 @@ class Estimator
     Matrix3d        Rs[(WINDOW_SIZE + 1)];
     Vector3d        Bas[(WINDOW_SIZE + 1)];
     Vector3d        Bgs[(WINDOW_SIZE + 1)];
+    Vector3d        Mw[(WINDOW_SIZE + 1)];	 // mag in world frame , ENU
+    Vector3d        Bms[(WINDOW_SIZE + 1)]; // bias of mag
+    double	        Bbs[(WINDOW_SIZE + 1)]; // bias of baro
     double td;
 
     Matrix3d back_R0, last_R, last_R0;
     Vector3d back_P0, last_P, last_P0;
+    Vector3d mag_measure[(WINDOW_SIZE + 1)];  // 磁力计测量值
+	double	 baro_measure[(WINDOW_SIZE + 1)]; // 气压计测量值
     double Headers[(WINDOW_SIZE + 1)];
 
     IntegrationBase *pre_integrations[(WINDOW_SIZE + 1)];
@@ -152,6 +166,8 @@ class Estimator
 
     double para_Pose[WINDOW_SIZE + 1][SIZE_POSE];
     double para_SpeedBias[WINDOW_SIZE + 1][SIZE_SPEEDBIAS];
+	double para_mag[WINDOW_SIZE + 1][SIZE_MAG];
+	double para_baro[WINDOW_SIZE + 1][SIZE_BARO];
     double para_Feature[NUM_OF_F][SIZE_FEATURE];
     double para_Ex_Pose[2][SIZE_POSE];
     double para_Retrive_Pose[SIZE_POSE];
@@ -170,8 +186,9 @@ class Estimator
     Eigen::Matrix3d initR;
 
     double latest_time;
-    Eigen::Vector3d latest_P, latest_V, latest_Ba, latest_Bg, latest_acc_0, latest_gyr_0;
+    Eigen::Vector3d latest_P, latest_V, latest_Ba, latest_Bg, latest_acc_0, latest_gyr_0, latest_Mw, latest_Bm,latest_mag_measure;
     Eigen::Quaterniond latest_Q;
+	double	latest_baro_measure, latest_Bb;
 
     bool initFirstPoseFlag;
     bool initThreadFlag;

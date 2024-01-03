@@ -168,7 +168,7 @@ void pubOdometry(const Estimator &estimator, const std_msgs::Header &header)
         foutC.close();
         Eigen::Vector3d tmp_T = estimator.Ps[WINDOW_SIZE];
         Eigen::Vector3d rpy = Utility::R2ypr(estimator.Rs[WINDOW_SIZE]);
-        ROS_INFO_THROTTLE(1/10,"%s t: %.3f,%.3f,%.3f rpy[deg]:%.2f,%.2f,%.2f%s%s",ANSI_COLOR_GREEN, tmp_T.x(), tmp_T.y(), tmp_T.z(),rpy.x(),rpy.y(),rpy.z(),ANSI_COLOR_GREEN,ANSI_COLOR_RESET);
+        ROS_INFO_THROTTLE(1/10,"%s t: %.3f,%.3f,%.3f rpy[deg]:%.2f,%.2f,%.2f td:%.4fs %s%s",ANSI_COLOR_GREEN, tmp_T.x(), tmp_T.y(), tmp_T.z(),rpy.x(),rpy.y(),rpy.z(),estimator.td,ANSI_COLOR_GREEN,ANSI_COLOR_RESET);
     }
 }
 

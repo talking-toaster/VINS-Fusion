@@ -3,11 +3,12 @@
 # debug
 enable_perf_output: 0
 warn_imu_duration: 0
-use_mag: 0  # 使用磁力计
+use_mag: 1  # 使用磁力计
 
 # for evo evaluation
 use_evaluation: 1
-gt_topic: "/mavros/local_position/odom"
+gt_topic: "/gazebo/model_states"
+gt_model_id: 90
 
 
 #common parameters
@@ -20,12 +21,10 @@ image0_topic: "/iris_swarm/stereo_camera/left/image_raw"
 image1_topic: "/iris_swarm/stereo_camera/right/image_raw"
 output_path: "/swarm/fisheye_ws/output"
 
-use_baro: 0
+use_baro: 1
 baro_topic: "/mavros/imu/static_pressure"
 temperature_topic: "/mavros/imu/temperature_imu"
-baro_measure_noise: 0.2
-baro_bias_noise: 0.000000000001
-baro_lpf_cutoff_freq: 80
+
 
 multiple_thread: 1
 
@@ -40,44 +39,28 @@ image_freq: 30
    
 
 # Extrinsic parameter between IMU and Camera.
-estimate_extrinsic: 0   # 0  Have an accurate extrinsic parameters. We will trust the following imu^R_cam, imu^T_cam, don't change it.
+estimate_extrinsic: 1   # 0  Have an accurate extrinsic parameters. We will trust the following imu^R_cam, imu^T_cam, don't change it.
                         # 1  Have an initial guess about extrinsic parameters. We will optimize around your initial guess.
                         # 2  Don't have extrinsic parameters. We will estimate extrinsic parameters online.
+
+
 body_T_cam0: !!opencv-matrix
    rows: 4
    cols: 4
    dt: d
-   data: [0,0,1,-0.13363,
-          -1,0,0,-0.11964,
-          0,-1,0,-0.041389,
-          0,0,0,1]
-
+   data: [ 6.0805007360076324e-04, -2.8383046002466994e-03,9.9999578714217829e-01, 1.0894345914794847e-01,
+       -9.9999964240731010e-01, -5.8948233283562246e-04,6.0637928033935307e-04, 3.2470405718606210e-02,
+       5.8775876032918228e-04, -9.9999579825996066e-01,-2.8386620200659962e-03, 4.4016305036162495e-03, 
+       0., 0., 0., 1. ]
 body_T_cam1: !!opencv-matrix
    rows: 4
    cols: 4
    dt: d
-   data: [0,0,1,-0.13173,
-          -1,0,0,-0.21270,
-          0,-1,0,-0.0425936,
-          0,0,0,1]
+   data: [ 4.9234749259063904e-04, -2.8379704597158439e-03,9.9999585175020411e-01, 1.0909090172928997e-01,
+       -9.9999968005196282e-01, -6.3186282033211860e-04,4.9055616199583651e-04, -6.0110507787251737e-02,
+       6.3046801531080332e-04, -9.9999577332759060e-01,-2.8382806477880163e-03, 4.3037688948443344e-03,
+        0., 0., 0., 1. ]
 
-# body_T_cam0: !!opencv-matrix
-#    rows: 4
-#    cols: 4
-#    dt: d
-#    data: [0,0,1,0.1,
-#           -1,0,0,0.045,
-#           0,-1,0,0,
-#           0,0,0,1]
-
-# body_T_cam1: !!opencv-matrix
-#    rows: 4
-#    cols: 4
-#    dt: d
-#    data: [0,0,1,0.1,
-#           -1,0,0,-0.045,
-#           0,-1,0,0,
-#           0,0,0,1]
 # imu 飞控，从mavros拿到是flu
 # cam 相机坐标系，右下前
 
@@ -113,19 +96,29 @@ acc_w: 4.2107983329585852e-03         # accelerometer bias random work noise sta
 g_norm: 9.8     # gravity magnitude
 
 acc_n_factor: 5.0
-acc_w_factor: 3.0
+acc_w_factor: 5.0
 gyr_n_factor: 5.0
 gyr_w_factor: 5.0
 
+mag_measure_factor: 1.0
+mag_world_factor: 1.0
+mag_bias_factor: 1.0
 
-mag_measure_noise: 1.2e-5
+baro_measure_factor: 0.01
+baro_bias_factor: 1.0
+
+mag_measure_noise: 1.0e-6
 mag_world_noise: 1.0e-6
 mag_bias_noise: 1.0e-14
-mag_lpf_cutoff_freq: 80.0
+mag_lpf_cutoff_freq: 40.0
+
+baro_measure_noise: 0.1
+baro_bias_noise: 0.000000000001
+baro_lpf_cutoff_freq: 40
 
 #unsynchronization parameters
 estimate_td: 1                      # online estimate time offset between camera and imu
-td: 0.0208                             # initial value of time offset. unit: s. readed image clock + td = real image clock (IMU clock)
+td: 0.0158                             # initial value of time offset. unit: s. readed image clock + td = real image clock (IMU clock)
 
 
 F_threshold: 1.0        # ransac threshold (pixel)

@@ -1,8 +1,8 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(vins)
 # 设置 C 和 C++ 编译器，使用 ccache 包装器
-set(CMAKE_C_COMPILER "clang")
-set(CMAKE_CXX_COMPILER "clang++")
+# set(CMAKE_C_COMPILER "clang")
+# set(CMAKE_CXX_COMPILER "clang++")
 
 
 set(CMAKE_BUILD_TYPE "Release")
@@ -22,7 +22,9 @@ find_package(catkin REQUIRED COMPONENTS
     tf
     cv_bridge_local
     camera_models
-    image_transport)
+    image_transport
+    gazebo_msgs
+  )
 
 find_package(OpenCV 4.8 REQUIRED)
 

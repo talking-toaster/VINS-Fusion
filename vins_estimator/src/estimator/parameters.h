@@ -64,13 +64,35 @@ extern double F_THRESHOLD;
 extern int SHOW_TRACK;
 extern int FLOW_BACK;
 
+extern bool		   USE_MAG;
+extern std::string MAG_TOPIC;
+
+extern double	   MAG_MEASURE_NOISE;
+extern double	   MAG_WORLD_NOISE;
+extern double	   MAG_BIAS_NOISE;
+extern double	   MAG_LPF_CUTOFF_FREQ;
+
+extern bool		   USE_BARO;
+extern std::string BARO_TOPIC;
+extern std::string TEMPERATURE_TOPIC;
+extern double	   BARO_MEASURE_NOISE;	 // 单位:m
+extern double	   BARO_BIAS_NOISE;		 // 单位:m
+extern double	   BARO_LPF_CUTOFF_FREQ; // 单位:Hz
+
+extern bool		   USE_EVALUATION;
+extern std::string GT_TOPIC;
+extern int GT_MODEL_ID;
+extern std::string GROUND_TRUTH_PATH;
+
 void readParameters(std::string config_file);
 
 enum SIZE_PARAMETERIZATION
 {
     SIZE_POSE = 7,
     SIZE_SPEEDBIAS = 9,
-    SIZE_FEATURE = 1
+    SIZE_FEATURE = 1,
+    SIZE_MAG = 6,
+    SIZE_BARO = 1,
 };
 
 enum StateOrder

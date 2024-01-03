@@ -147,4 +147,55 @@ class Utility
         return angle_degrees +
             two_pi * std::floor((-angle_degrees + T(180)) / two_pi);
     };
+
+    	class LPF_1D {
+	  private:
+		bool   inited = false;
+		double last;
+		double alpha;
+		double _1_alpha;
+
+	  public:
+		LPF_1D(double dt, double cutoff_freq) {
+			double a = dt / (dt + 1 / (2 * M_PI * cutoff_freq));
+			alpha	 = a;
+			_1_alpha = 1 - a;
+		}
+		void reinit(double dt, double cutoff_freq) {
+			double a = dt / (dt + 1 / (2 * M_PI * cutoff_freq));
+			alpha	 = a;
+			_1_alpha = 1 - a;
+		}
+		double update(double x) {
+			if (!inited) {
+				last   = x;
+				inited = true;
+			}
+			last = alpha * last + _1_alpha * x;
+			return last;
+		}
+	};
+
+	class LPF_3D {
+	  private:
+		bool			inited = false;
+		Eigen::Vector3d last;
+		Eigen::Matrix3d alpha;
+		Eigen::Matrix3d _1_alpha;
+
+	  public:
+		LPF_3D(double dt, double cutoff_freq) {
+			double a = dt / (dt + 1 / (2 * M_PI * cutoff_freq));
+			alpha << a, 0, 0, 0, a, 0, 0, 0, a;
+			_1_alpha << 1 - a, 0, 0, 0, 1 - a, 0, 0, 0, 1 - a;
+		}
+		Eigen::Vector3d update(Eigen::Vector3d x) {
+			if (!inited) {
+				last   = x;
+				inited = true;
+			}
+			last = alpha * last + _1_alpha * x;
+			return last;
+		}
+	};
 };
