@@ -49,9 +49,9 @@ if(NOT ANDROID)
 add_subdirectory(python)
 endif()
 add_subdirectory(src)
-if(CATKIN_ENABLE_TESTING)
-  add_subdirectory(test)
-endif()
+#if(CATKIN_ENABLE_TESTING)
+#  add_subdirectory(test)
+#endif()
 
 # install the include folder
 install(

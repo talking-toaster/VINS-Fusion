@@ -1,0 +1,126 @@
+%YAML:1.0
+
+# debug
+enable_perf_output: 0
+warn_imu_duration: 0
+use_mag: 0  # 使用磁力计
+
+# for evo evaluation
+use_evaluation: 0
+gt_topic: "/gazebo/model_states"
+gt_model_id: 90
+
+
+#common parameters
+imu: 1         
+num_of_cam: 2  
+
+imu_topic: "/camera/imu"
+mag_topic: "/mavros/imu/mag"
+image0_topic: "/camera/infra1/image_rect_raw"
+image1_topic: "/camera/infra2/image_rect_raw"
+output_path: "/drone/vins_ws/output"
+
+use_baro: 0
+baro_topic: "/mavros/imu/static_pressure"
+temperature_topic: "/mavros/imu/temperature_imu"
+
+
+multiple_thread: 1
+
+
+cam0_calib: "left.yaml"
+cam1_calib: "right.yaml"
+image_width: 848
+image_height: 480
+
+imu_freq: 250
+image_freq: 30
+
+
+# Extrinsic parameter between IMU and Camera.
+estimate_extrinsic: 1   # 0  Have an accurate extrinsic parameters. We will trust the following imu^R_cam, imu^T_cam, don't change it.
+                        # 1  Have an initial guess about extrinsic parameters. We will optimize around your initial guess.
+                        # 2  Don't have extrinsic parameters. We will estimate extrinsic parameters online.
+
+
+body_T_cam0: !!opencv-matrix
+   rows: 4
+   cols: 4
+   dt: d
+   data: [   0.99999000 , 0.0011061,   0.00433268,  -0.0492581,
+            -0.00111919 , 0.999995 ,   0.00302018,  0.00955285,
+            -0.00432932 , -0.003025,   0.999986  ,  0.00814573,
+                     0  ,        0 ,        0    ,      1]
+
+body_T_cam1: !!opencv-matrix
+   rows: 4
+   cols: 4
+   dt: d
+   data: [   0.999985  ,  0.0014202 , 0.00523479 ,  0.0443596 ,
+            -0.00143609,    0.999994,  0.00303341,  0.00954181,
+            -0.00523046, -0.00304089,    0.999982,  0.00681794,
+                     0 ,           0,           0,           1]
+
+#Gpu accleration support
+use_gpu: 0
+use_nvidia_vpi: 0
+
+enable_depth: 0
+
+#feature traker paprameters
+use_orb: 0              # use orb feature or not
+max_cnt: 200            # max feature number in feature tracking
+max_solve_cnt: 50       # Max Point for solve; highly influence performace, 后端求解的点数
+depth_estimate_baseline: 0.095
+thres_outlier : 3.0
+tri_max_err: 1.5
+
+min_dist: 30            # min distance between two features 
+show_track: 1           # publish tracking image as topic
+flow_back: 1            # perform forward and backward optical flow to improve feature tracking accuracy
+
+#optimization parameters
+max_solver_time: 0.04  # max solver itration time (ms), to guarantee real time
+max_num_iterations: 8   # max solver itrations, to guarantee real time
+keyframe_parallax: 10.0 # keyframe selection threshold (pixel)
+
+# #imu parameters       The more accurate parameters you provide, the better performance
+# acc_n: 1.2407019754798160e-02          # accelerometer measurement noise standard deviation. #0.2   0.04
+# gyr_n: 1.8471742333109878e-02         # gyroscope measurement noise standard deviation.     #0.05  0.004
+# acc_w: 4.3532336836159708e-02         # accelerometer bias random work noise standard deviation.  #0.002
+# gyr_w: 2.1745490632195261e-02       # gyroscope bias random work noise standard deviation.     #4.0e-5
+# g_norm: 9.81007         # gravity magnitude
+#imu parameters       The more accurate parameters you provide, the better performance
+acc_n: 0.02          # accelerometer measurement noise standard deviation. #0.2
+gyr_n: 0.05         # gyroscope measurement noise standard deviation.     #0.05
+acc_w: 0.02         # accelerometer bias random work noise standard deviation.  #0.02
+gyr_w: 0.001        # gyroscope bias random work noise standard deviation.     #4.0e-5
+g_norm: 9.81007     # gravity magnitude
+
+acc_n_factor: 1.0
+acc_w_factor: 1.0
+gyr_n_factor: 1.0
+gyr_w_factor: 1.0
+
+mag_measure_factor: 1.0
+mag_world_factor: 1.0
+mag_bias_factor: 1.0
+
+baro_measure_factor: 0.01
+baro_bias_factor: 1.0
+
+mag_measure_noise: 1.0e-6
+mag_world_noise: 1.0e-6
+mag_bias_noise: 1.0e-14
+mag_lpf_cutoff_freq: 40.0
+
+baro_measure_noise: 0.1
+baro_bias_noise: 0.000000000001
+baro_lpf_cutoff_freq: 40
+
+#unsynchronization parameters
+estimate_td: 1                      # online estimate time offset between camera and imu
+td: 0.0048                             # initial value of time offset. unit: s. readed image clock + td = real image clock (IMU clock)
+
+F_threshold: 1.0        # ransac threshold (pixel)

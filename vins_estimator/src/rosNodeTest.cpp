@@ -381,12 +381,12 @@ int main(int argc, char **argv)
         pub_baro_alt	 = n.advertise<std_msgs::Float32>("baro_alt", 10);
 		pub_raw_baro_alt = n.advertise<std_msgs::Float32>("raw_baro_alt", 10);
     }
-    ros::Subscriber sub_feature = n.subscribe("/feature_tracker/feature", 2000, feature_callback);
-    ros::Subscriber sub_img0 = n.subscribe(IMAGE0_TOPIC, 100, img0_callback,ros::TransportHints().tcpNoDelay());
+    ros::Subscriber sub_feature = n.subscribe("/feature_tracker/feature", 20, feature_callback);
+    ros::Subscriber sub_img0 = n.subscribe(IMAGE0_TOPIC, 10, img0_callback,ros::TransportHints().tcpNoDelay());
     ros::Subscriber sub_img1;
     if(STEREO)
     {
-        sub_img1 = n.subscribe(IMAGE1_TOPIC, 100, img1_callback,ros::TransportHints().tcpNoDelay());
+        sub_img1 = n.subscribe(IMAGE1_TOPIC, 10, img1_callback,ros::TransportHints().tcpNoDelay());
     }
     if(USE_EVALUATION)
     {
