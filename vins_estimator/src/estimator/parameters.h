@@ -84,6 +84,8 @@ extern std::string GT_TOPIC;
 extern int GT_MODEL_ID;
 extern std::string GROUND_TRUTH_PATH;
 
+extern bool USE_GPU;
+
 void readParameters(std::string config_file);
 
 enum SIZE_PARAMETERIZATION

@@ -17,6 +17,13 @@
 #include <execinfo.h>
 #include <csignal>
 #include <opencv2/opencv.hpp>
+
+#ifdef WITH_CUDA
+#include <opencv2/cudaoptflow.hpp>
+#include <opencv2/cudaimgproc.hpp>
+#include <opencv2/cudaarithm.hpp>
+#endif
+
 #include <eigen3/Eigen/Dense>
 
 #include "camodocal/camera_models/CameraFactory.h"

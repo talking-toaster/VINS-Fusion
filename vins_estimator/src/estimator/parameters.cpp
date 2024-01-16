@@ -66,6 +66,8 @@ std::string GT_TOPIC;
 int GT_MODEL_ID;
 std::string GROUND_TRUTH_PATH;
 
+bool USE_GPU;
+
 
 
 cv::FileStorage config;
@@ -100,6 +102,7 @@ void readParameters(std::string config_file)
     FLOW_BACK = readParam<int>("flow_back");
     MULTIPLE_THREAD = readParam<int>("multiple_thread");
 
+    USE_GPU = readParam<bool>("use_gpu");
     USE_IMU = readParam<int>("imu");
     printf("USE_IMU: %d\n", USE_IMU);
     if(USE_IMU)

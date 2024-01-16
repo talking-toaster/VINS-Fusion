@@ -3,7 +3,7 @@ project(vins)
 # 设置 C 和 C++ 编译器，使用 ccache 包装器
 # set(CMAKE_C_COMPILER "clang")
 # set(CMAKE_CXX_COMPILER "clang++")
-
+set(ENABLE_GPU true)
 
 set(CMAKE_BUILD_TYPE "Release")
 set(CMAKE_CXX_FLAGS "-std=c++17 -fopenmp")
@@ -25,8 +25,12 @@ find_package(catkin REQUIRED COMPONENTS
     image_transport
     gazebo_msgs
   )
-
-find_package(OpenCV 4.8 REQUIRED)
+if(ENABLE_GPU)
+  find_package(OpenCV REQUIRED cudaimgproc)
+  add_definitions(-DWITH_CUDA)
+else()
+  find_package(OpenCV 4.8 REQUIRED)
+endif()
 
 message(WARNING "OpenCV_VERSION: ${OpenCV_VERSION}")
 
