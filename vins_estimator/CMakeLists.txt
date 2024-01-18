@@ -31,6 +31,13 @@ if(ENABLE_GPU)
 else()
   find_package(OpenCV 4.8 REQUIRED)
 endif()
+set(ENABLE_BACKWARD true)
+if(ENABLE_BACKWARD)
+    set(LIBDW "dw")
+    add_definitions(-DUSE_BACKWARD)
+else()
+    set(LIBDW "")
+endif()
 
 message(WARNING "OpenCV_VERSION: ${OpenCV_VERSION}")
 
@@ -71,7 +78,7 @@ target_link_libraries(vins_lib ${catkin_LIBRARIES} ${OpenCV_LIBS} ${CERES_LIBRAR
 
 
 add_executable(vins_node src/rosNodeTest.cpp)
-target_link_libraries(vins_node vins_lib) 
+target_link_libraries(vins_node vins_lib ${LIBDW}) 
 
 
 # add_executable(kitti_odom_test src/KITTIOdomTest.cpp)

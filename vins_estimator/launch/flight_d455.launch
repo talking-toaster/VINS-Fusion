@@ -1,5 +1,6 @@
 <launch>
-    <node name="vins_estimator" pkg="vins" type="vins_node" output="screen" args="$(find vins)/../config/flight_d455/flight_d455.yaml">
+    <node name="vins_estimator" pkg="vins" type="vins_node" output="screen" 
+    args="$(find vins)/../config/flight_d455/flight_d455.yaml">
         <remap  from="~vision_pose_to_fcu" to="/mavros/vision_pose/pose" />
     </node>
 

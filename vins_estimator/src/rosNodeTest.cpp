@@ -8,6 +8,13 @@
  *
  * Author: Qin Tong (qintonguav@gmail.com)
  *******************************************************/
+#ifdef USE_BACKWARD
+#define BACKWARD_HAS_DW 1
+#include "utility/backward.hpp"
+namespace backward {
+backward::SignalHandling sh;
+}
+#endif
 
 #include <stdio.h>
 #include <queue>
@@ -24,6 +31,7 @@
 #include <sensor_msgs/FluidPressure.h>
 #include <sensor_msgs/Temperature.h>
 #include <gazebo_msgs/ModelStates.h>
+
 
 Estimator estimator;
 
@@ -75,6 +83,7 @@ cv::Mat getImageFromMsg(const sensor_msgs::ImageConstPtr &img_msg) {
 
 // extract images with same timestamp from two topics
 void sync_process() {
+	double last_update_time = 0;
 	while (1) {
 		if (STEREO) {
 			cv::Mat			 image0, image1;
@@ -102,8 +111,16 @@ void sync_process() {
 				}
 			}
 			m_buf.unlock();
-			if (!image0.empty())
+			double now_time = ros::Time::now().toSec();
+			if (last_update_time != 0 && now_time - last_update_time > 10) {
+				exit(0);
+			}
+			if (!image0.empty()) {
 				estimator.inputImage(time, image0, image1);
+				double now_time	 = ros::Time::now().toSec();
+				last_update_time = now_time;
+			}
+
 		} else {
 			cv::Mat			 image;
 			std_msgs::Header header;
@@ -340,27 +357,27 @@ int main(int argc, char **argv) {
 	ros::Subscriber sub_imu_temperautre;
 	ros::Subscriber sub_gt;
 	if (USE_IMU) {
-		sub_imu = n.subscribe(IMU_TOPIC, 10, imu_callback, ros::TransportHints().tcpNoDelay());
+		sub_imu = n.subscribe(IMU_TOPIC, 10000, imu_callback, ros::TransportHints().tcpNoDelay());
 	}
 	if (USE_MAG) {
-		sub_mag		= n.subscribe(MAG_TOPIC, 10, mag_callback, ros::TransportHints().tcpNoDelay());
+		sub_mag		= n.subscribe(MAG_TOPIC, 10000, mag_callback, ros::TransportHints().tcpNoDelay());
 		pub_mag_lpf = n.advertise<sensor_msgs::MagneticField>("/vins_estimator/mag_lpf", 10);
 	}
 	if (USE_BARO) {
-		sub_baro = n.subscribe(BARO_TOPIC, 10, baro_callback, ros::TransportHints().tcpNoDelay());
+		sub_baro = n.subscribe(BARO_TOPIC, 10000, baro_callback, ros::TransportHints().tcpNoDelay());
 		sub_imu_temperautre =
-			n.subscribe(TEMPERATURE_TOPIC, 10, temperature_callback, ros::TransportHints().tcpNoDelay());
-		pub_baro_alt	 = n.advertise<std_msgs::Float32>("baro_alt", 10);
-		pub_raw_baro_alt = n.advertise<std_msgs::Float32>("raw_baro_alt", 10);
+			n.subscribe(TEMPERATURE_TOPIC, 10000, temperature_callback, ros::TransportHints().tcpNoDelay());
+		pub_baro_alt	 = n.advertise<std_msgs::Float32>("baro_alt", 10000);
+		pub_raw_baro_alt = n.advertise<std_msgs::Float32>("raw_baro_alt", 10000);
 	}
-	ros::Subscriber sub_feature = n.subscribe("/feature_tracker/feature", 20, feature_callback);
-	ros::Subscriber sub_img0	= n.subscribe(IMAGE0_TOPIC, 10, img0_callback, ros::TransportHints().tcpNoDelay());
+	ros::Subscriber sub_feature = n.subscribe("/feature_tracker/feature", 20000, feature_callback);
+	ros::Subscriber sub_img0	= n.subscribe(IMAGE0_TOPIC, 10000, img0_callback, ros::TransportHints().tcpNoDelay());
 	ros::Subscriber sub_img1;
 	if (STEREO) {
-		sub_img1 = n.subscribe(IMAGE1_TOPIC, 10, img1_callback, ros::TransportHints().tcpNoDelay());
+		sub_img1 = n.subscribe(IMAGE1_TOPIC, 10000, img1_callback, ros::TransportHints().tcpNoDelay());
 	}
 	if (USE_EVALUATION) {
-		sub_gt = n.subscribe(GT_TOPIC, 10, ground_truth_callback, ros::TransportHints().tcpNoDelay());
+		sub_gt = n.subscribe(GT_TOPIC, 10000, ground_truth_callback, ros::TransportHints().tcpNoDelay());
 		// gt_pose_pub = n.advertise<geometry_msgs::PoseStamped>("/vins_estimator/ground_truth", 10);
 	}
 
